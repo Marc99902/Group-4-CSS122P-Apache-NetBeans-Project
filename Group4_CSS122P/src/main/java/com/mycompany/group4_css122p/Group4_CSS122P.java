@@ -21,7 +21,7 @@ public class Group4_CSS122P {
         scanner = new Scanner(System.in);
         
         System.out.println("==============================================");
-        System.out.println("   EMPLOYEE PROFILE MANAGEMENT SYSTEM COMPANY");
+        System.out.println("   EMPLOYEE PROFILE MANAGEMENT SYSTEM");
         System.out.println("   Console Test Application");
         System.out.println("==============================================");
         
