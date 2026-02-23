@@ -1,0 +1,6 @@
+EMPLOYEE,E001,Juan,Dela Cruz,juan@company.com,09123456789,IT,Software Developer,92.5,45000.0,2023-01-15
+EMPLOYEE,E002,Maria,Santos,maria@company.com,09234567890,HR,HR Specialist,85.0,35000.0,2023-02-20
+EMPLOYEE,E003,Pedro,Reyes,pedro@company.com,09345678901,IT,System Analyst,65.5,40000.0,2023-03-10
+EMPLOYEE,E004,Ana,Garcia,ana@company.com,09456789012,Finance,Accountant,78.0,38000.0,2023-04-05
+MANAGER,M001,Carlos,Lim,carlos@company.com,09567890123,IT,IT Manager,95.0,80000.0,2022-01-10,10,Senior,20.0
+MANAGER,M002,Sofia,Tan,sofia@company.com,09678901234,HR,HR Manager,88.5,65000.0,2022-06-15,5,Mid,15.0
