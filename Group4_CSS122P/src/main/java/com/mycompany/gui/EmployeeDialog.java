@@ -12,9 +12,9 @@ import java.awt.*;
  * @author Kage
  */
 public class EmployeeDialog extends JDialog {
-    private EmployeeDataManager dataManager;
-    private Employee employee;
-    private boolean isEditMode;
+    private final EmployeeDataManager dataManager;
+    private final Employee employee;
+    private final boolean isEditMode;
     
     // Form fields
     private JTextField idField;
@@ -226,9 +226,8 @@ public class EmployeeDialog extends JDialog {
         salaryField.setText(String.valueOf(employee.getSalary()));
         hireDateField.setText(employee.getHireDate());
         
-        if (employee instanceof Manager) {
+        if (employee instanceof Manager mgr) {
             typeCombo.setSelectedItem("MANAGER");
-            Manager mgr = (Manager) employee;
             teamSizeField.setText(String.valueOf(mgr.getTeamSize()));
             managementLevelField.setText(mgr.getManagementLevel());
             bonusField.setText(String.valueOf(mgr.getBonusPercentage()));

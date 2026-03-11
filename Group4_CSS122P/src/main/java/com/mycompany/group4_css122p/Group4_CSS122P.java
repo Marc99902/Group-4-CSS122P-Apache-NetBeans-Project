@@ -1,11 +1,11 @@
 package com.mycompany.group4_css122p;
 
+import java.util.List;
+import java.util.Scanner;
+
 import com.mycompany.group4_css122p.data.EmployeeDataManager;
 import com.mycompany.group4_css122p.factory.EmployeeFactory;
 import com.mycompany.group4_css122p.model.Employee;
-import com.mycompany.group4_css122p.model.Manager;
-import java.util.List;
-import java.util.Scanner;
 
 /**
  * Employee Profile Management System - Console Version
