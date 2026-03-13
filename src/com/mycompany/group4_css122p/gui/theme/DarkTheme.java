@@ -66,7 +66,7 @@ public class DarkTheme {
     
     // Border Colors
     public static final Color BORDER_COLOR = new Color(0x555555);        // #555555
-    public static final Color BORDER_FOCUS = new Color(0x007ACC);        // #007ACC
+    public static final Color BORDER_FOCUS1 = new Color(0x007ACC);        // #007ACC
     
     // ============================================================
     // FONTS
@@ -84,7 +84,7 @@ public class DarkTheme {
     // ============================================================
     
     public static final Border BORDER_DEFAULT = BorderFactory.createLineBorder(BORDER_COLOR);
-    public static final Border BORDER_FOCUS = BorderFactory.createLineBorder(BORDER_FOCUS, 2);
+    public static final Border BORDER_FOCUS = BorderFactory.createLineBorder(BORDER_FOCUS1, 2);
     public static final Border BORDER_EMPTY_5 = BorderFactory.createEmptyBorder(5, 5, 5, 5);
     public static final Border BORDER_EMPTY_10 = BorderFactory.createEmptyBorder(10, 10, 10, 10);
     public static final Border BORDER_COMPOUND = BorderFactory.createCompoundBorder(
