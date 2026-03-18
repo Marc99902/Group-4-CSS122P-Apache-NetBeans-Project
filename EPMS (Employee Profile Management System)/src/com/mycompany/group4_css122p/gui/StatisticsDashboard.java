@@ -3,13 +3,11 @@ package com.mycompany.group4_css122p.gui;
 import com.mycompany.group4_css122p.data.EmployeeDataManager;
 import com.mycompany.group4_css122p.gui.theme.ProfessionalTheme;
 import com.mycompany.group4_css122p.model.Employee;
-import com.mycompany.group4_css122p.model.Manager;
-
-import javax.swing.*;
-import javax.swing.border.*;
 import java.awt.*;
 import java.util.List;
 import java.util.Map;
+import javax.swing.*;
+import javax.swing.border.*;
 
 /**
  * StatisticsDashboard.java - Second GUI Application
@@ -40,10 +38,10 @@ public class StatisticsDashboard extends JFrame {
     // ============================================================
     
     /** Reference to main GUI (parent) */
-    private MainGUI mainGUI;
+    private final MainGUI mainGUI;
     
     /** Data manager shared with main GUI */
-    private EmployeeDataManager dataManager;
+    private final EmployeeDataManager dataManager;
     
     // Statistics labels
     private JLabel totalEmpValue;
@@ -56,6 +54,8 @@ public class StatisticsDashboard extends JFrame {
     private JLabel totalPayrollValue;
     private JLabel avgSalaryValue;
     private JLabel highestPaidValue;
+    private JLabel highestPaidNameLabel;
+    private JLabel highestPaidSalaryLabel;
     
     // Charts panel
     private JPanel performanceChartPanel;
@@ -85,7 +85,7 @@ public class StatisticsDashboard extends JFrame {
         setupLayout();
         
         // Load initial statistics
-        refreshStatistics();
+        refreshStatisticsInternal();
         
         // Window settings
         setTitle("Employee Statistics Dashboard");
@@ -113,6 +113,8 @@ public class StatisticsDashboard extends JFrame {
         totalPayrollValue = createValueLabel("$0");
         avgSalaryValue = createValueLabel("$0");
         highestPaidValue = createValueLabel("-");
+        highestPaidNameLabel = createValueLabel("N/A");
+        highestPaidSalaryLabel = createValueLabel("$0");
         
         // Chart panels
         performanceChartPanel = new JPanel();
@@ -455,6 +457,13 @@ public class StatisticsDashboard extends JFrame {
         ));
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
         panel.setPreferredSize(new Dimension(0, 100));
+
+        JPanel content = new JPanel(new GridLayout(1, 2, 10, 0));
+        content.setBackground(ProfessionalTheme.BACKGROUND_DARK);
+        content.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        content.add(createMetricCard("Employee", highestPaidNameLabel, ProfessionalTheme.ACCENT_PRIMARY));
+        content.add(createMetricCard("Monthly Salary", highestPaidSalaryLabel, ProfessionalTheme.SUCCESS));
+        panel.add(content, BorderLayout.CENTER);
         
         return panel;
     }
@@ -467,6 +476,10 @@ public class StatisticsDashboard extends JFrame {
      * Refreshes all statistics with current data
      */
     public void refreshStatistics() {
+        refreshStatisticsInternal();
+    }
+
+    private void refreshStatisticsInternal() {
         // Get statistics from data manager
         Map<String, Object> stats = dataManager.getStatistics();
         
@@ -485,6 +498,8 @@ public class StatisticsDashboard extends JFrame {
         totalPayrollValue.setText(String.format("$%,.0f", stats.get("totalMonthlyPayroll")));
         avgSalaryValue.setText(String.format("$%,.0f", stats.get("averageSalary")));
         highestPaidValue.setText((String) stats.get("highestPaid"));
+        highestPaidNameLabel.setText((String) stats.get("highestPaid"));
+        highestPaidSalaryLabel.setText(String.format("$%,.0f", stats.get("highestSalary")));
         
         // Update charts
         updatePerformanceChart(

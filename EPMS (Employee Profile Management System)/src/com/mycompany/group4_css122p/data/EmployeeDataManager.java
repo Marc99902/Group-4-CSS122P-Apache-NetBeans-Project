@@ -2,8 +2,11 @@ package com.mycompany.group4_css122p.data;
 
 import com.mycompany.group4_css122p.model.Employee;
 import com.mycompany.group4_css122p.model.Manager;
-
 import java.io.*;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 /**
@@ -39,7 +42,7 @@ public class EmployeeDataManager {
     // ============================================================
     
     /** Filename for data persistence */
-    private static final String DATA_FILE = "employees.dat";
+    private static final Path DATA_FILE = resolveDataFilePath();
     
     /** Performance status codes */
     private static final String STATUS_EE = "EE";
@@ -60,7 +63,7 @@ public class EmployeeDataManager {
      * Tracks if data has been modified since last save
      * Used to optimize save operations
      */
-    private boolean dataModified;
+    private String lastErrorMessage;
     
     // ============================================================
     // CONSTRUCTOR
@@ -77,7 +80,7 @@ public class EmployeeDataManager {
         loadData();
         
         // Mark as not modified (just loaded)
-        dataModified = false;
+        lastErrorMessage = null;
     }
     
     // ============================================================
@@ -91,18 +94,22 @@ public class EmployeeDataManager {
      * @return true if added successfully, false if ID already exists
      */
     public boolean addEmployee(Employee employee) {
+        lastErrorMessage = null;
+
         // Check if employee with same ID already exists
         if (findEmployeeById(employee.getId()) != null) {
+            lastErrorMessage = "Employee ID already exists.";
             return false;  // ID already exists
         }
         
         // Add to list
         employees.add(employee);
-        
-        // Mark data as modified and save
-        dataModified = true;
-        saveData();
-        
+
+        if (!saveData()) {
+            employees.remove(employees.size() - 1);
+            return false;
+        }
+
         return true;
     }
     
@@ -113,20 +120,24 @@ public class EmployeeDataManager {
      * @return true if updated successfully, false if not found
      */
     public boolean updateEmployee(Employee updatedEmployee) {
+        lastErrorMessage = null;
+
         // Find the employee to update
         for (int i = 0; i < employees.size(); i++) {
             if (employees.get(i).getId().equals(updatedEmployee.getId())) {
                 // Replace with updated employee
-                employees.set(i, updatedEmployee);
-                
-                // Mark as modified and save
-                dataModified = true;
-                saveData();
-                
+                Employee originalEmployee = employees.set(i, updatedEmployee);
+
+                if (!saveData()) {
+                    employees.set(i, originalEmployee);
+                    return false;
+                }
+
                 return true;
             }
         }
-        
+
+        lastErrorMessage = "Employee not found.";
         return false;  // Employee not found
     }
     
@@ -137,21 +148,24 @@ public class EmployeeDataManager {
      * @return true if removed successfully, false if not found
      */
     public boolean removeEmployeeById(String id) {
+        lastErrorMessage = null;
+
         // Find and remove employee
-        Iterator<Employee> iterator = employees.iterator();
-        while (iterator.hasNext()) {
-            Employee emp = iterator.next();
+        for (int i = 0; i < employees.size(); i++) {
+            Employee emp = employees.get(i);
             if (emp.getId().equals(id)) {
-                iterator.remove();
-                
-                // Mark as modified and save
-                dataModified = true;
-                saveData();
-                
+                employees.remove(i);
+
+                if (!saveData()) {
+                    employees.add(i, emp);
+                    return false;
+                }
+
                 return true;
             }
         }
-        
+
+        lastErrorMessage = "Employee not found.";
         return false;  // Employee not found
     }
     
@@ -267,8 +281,8 @@ public class EmployeeDataManager {
         
         for (Employee emp : employees) {
             // Check if employee is a Manager instance
-            if (emp instanceof Manager) {
-                managers.add((Manager) emp);  // Cast to Manager
+            if (emp instanceof Manager manager) {
+                managers.add(manager);
             }
         }
         
@@ -379,6 +393,14 @@ public class EmployeeDataManager {
     public List<Employee> getTopPerformers() {
         return getEmployeesByPerformanceStatus(STATUS_EE);
     }
+
+    public String getLastErrorMessage() {
+        return lastErrorMessage;
+    }
+
+    public Path getDataFilePath() {
+        return DATA_FILE;
+    }
     
     // ============================================================
     // DATA PERSISTENCE - Save & Load
@@ -388,21 +410,29 @@ public class EmployeeDataManager {
      * Saves all employee data to file using serialization
      * This ensures data persists between application runs
      */
-    public void saveData() {
+    public boolean saveData() {
+        lastErrorMessage = null;
+
+        try {
+            Files.createDirectories(DATA_FILE.getParent());
+        } catch (IOException e) {
+            lastErrorMessage = "Unable to prepare the data folder: " + e.getMessage();
+            return false;
+        }
+
         try (ObjectOutputStream oos = new ObjectOutputStream(
-                new FileOutputStream(DATA_FILE))) {
+                Files.newOutputStream(DATA_FILE))) {
             
             // Write the entire employee list to file
             oos.writeObject(employees);
-            
-            // Mark as saved
-            dataModified = false;
-            
+
             System.out.println("Data saved successfully! (" + employees.size() + " employees)");
-            
+
+            return true;
         } catch (IOException e) {
-            System.err.println("Error saving data: " + e.getMessage());
-            e.printStackTrace();
+            lastErrorMessage = "Error saving data: " + e.getMessage();
+            System.err.println(lastErrorMessage);
+            return false;
         }
     }
     
@@ -411,8 +441,8 @@ public class EmployeeDataManager {
      * Called automatically during initialization
      */
     @SuppressWarnings("unchecked")
-    public void loadData() {
-        File file = new File(DATA_FILE);
+    private void loadData() {
+        File file = DATA_FILE.toFile();
         
         // Check if file exists
         if (!file.exists()) {
@@ -421,7 +451,7 @@ public class EmployeeDataManager {
         }
         
         try (ObjectInputStream ois = new ObjectInputStream(
-                new FileInputStream(DATA_FILE))) {
+                Files.newInputStream(DATA_FILE))) {
             
             // Read the employee list from file
             Object obj = ois.readObject();
@@ -434,8 +464,8 @@ public class EmployeeDataManager {
         } catch (FileNotFoundException e) {
             System.out.println("Data file not found. Starting with empty database.");
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error loading data: " + e.getMessage());
-            e.printStackTrace();
+            lastErrorMessage = "Error loading data: " + e.getMessage();
+            System.err.println(lastErrorMessage);
             // Start with empty list if load fails
             employees = new ArrayList<>();
         }
@@ -449,12 +479,11 @@ public class EmployeeDataManager {
         employees.clear();
         
         // Delete the data file
-        File file = new File(DATA_FILE);
+        File file = DATA_FILE.toFile();
         if (file.exists()) {
             file.delete();
         }
-        
-        dataModified = true;
+
         System.out.println("All data cleared!");
     }
     
@@ -492,5 +521,35 @@ public class EmployeeDataManager {
         stats.put("highestSalary", highestPaid != null ? highestPaid.getSalary() : 0);
         
         return stats;
+    }
+
+    private static Path resolveDataFilePath() {
+        try {
+            Path codeSourcePath = Paths.get(EmployeeDataManager.class
+                .getProtectionDomain()
+                .getCodeSource()
+                .getLocation()
+                .toURI());
+            Path baseDirectory = Files.isDirectory(codeSourcePath)
+                ? codeSourcePath
+                : codeSourcePath.getParent();
+
+            if (baseDirectory != null
+                    && baseDirectory.getFileName() != null
+                    && "bin".equalsIgnoreCase(baseDirectory.getFileName().toString())) {
+                Path projectRoot = baseDirectory.getParent();
+                if (projectRoot != null) {
+                    return projectRoot.resolve("employees.dat");
+                }
+            }
+
+            if (baseDirectory != null) {
+                return baseDirectory.resolve("employees.dat");
+            }
+        } catch (URISyntaxException e) {
+            System.err.println("Unable to resolve data file location: " + e.getMessage());
+        }
+
+        return Paths.get("employees.dat").toAbsolutePath();
     }
 }

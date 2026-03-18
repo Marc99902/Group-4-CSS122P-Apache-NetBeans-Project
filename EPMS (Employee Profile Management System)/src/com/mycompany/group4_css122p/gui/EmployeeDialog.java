@@ -5,11 +5,21 @@ import com.mycompany.group4_css122p.factory.EmployeeFactory;
 import com.mycompany.group4_css122p.gui.theme.ProfessionalTheme;
 import com.mycompany.group4_css122p.model.Employee;
 import com.mycompany.group4_css122p.model.Manager;
-
+import java.awt.*;
+import java.math.BigInteger;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import java.util.Date;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import javax.swing.*;
 import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.DateFormatter;
 
 /**
  * EmployeeDialog.java - Dialog for Adding/Editing Employees
@@ -31,16 +41,31 @@ import java.awt.event.*;
  * @version 1.0
  */
 public class EmployeeDialog extends JDialog {
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+    );
+    private static final Pattern PHONE_ALLOWED_PATTERN = Pattern.compile(
+        "^[+()\\-\\s0-9]+$"
+    );
+    private static final DecimalFormat GROUPING_FORMAT = new DecimalFormat(
+        "#,##0",
+        DecimalFormatSymbols.getInstance(Locale.US)
+    );
+    private static final DecimalFormat CURRENCY_FORMAT = new DecimalFormat(
+        "$#,##0.00",
+        DecimalFormatSymbols.getInstance(Locale.US)
+    );
     
     // ============================================================
     // INSTANCE VARIABLES
     // ============================================================
     
     /** Reference to data manager for saving changes */
-    private EmployeeDataManager dataManager;
+    private final EmployeeDataManager dataManager;
     
     /** Employee being edited (null for add mode) */
-    private Employee existingEmployee;
+    private final Employee existingEmployee;
     
     /** Flag to track if save was successful */
     private boolean saved = false;
@@ -56,13 +81,14 @@ public class EmployeeDialog extends JDialog {
     private JTextField positionField;
     private JTextField ratingField;
     private JTextField salaryField;
-    private JTextField hireDateField;
+    private JSpinner hireDateSpinner;
     
     // Manager-specific fields
     private JTextField teamSizeField;
     private JComboBox<String> levelComboBox;
     private JTextField bonusField;
     private JPanel managerPanel;
+    private boolean salaryFieldUpdating;
     
     // ============================================================
     // CONSTRUCTOR
@@ -126,8 +152,8 @@ public class EmployeeDialog extends JDialog {
         departmentField = createStyledTextField();
         positionField = createStyledTextField();
         ratingField = createStyledTextField();
-        salaryField = createStyledTextField();
-        hireDateField = createStyledTextField();
+        salaryField = createCurrencyTextField();
+        hireDateSpinner = createStyledDateSpinner();
         
         // Manager-specific fields
         teamSizeField = createStyledTextField();
@@ -157,6 +183,36 @@ public class EmployeeDialog extends JDialog {
         JTextField field = new JTextField(20);
         ProfessionalTheme.styleTextField(field);
         return field;
+    }
+
+    private JTextField createCurrencyTextField() {
+        JTextField field = createStyledTextField();
+        field.setHorizontalAlignment(SwingConstants.RIGHT);
+        return field;
+    }
+
+    private JSpinner createStyledDateSpinner() {
+        SpinnerDateModel model = new SpinnerDateModel();
+        JSpinner spinner = new JSpinner(model);
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(spinner, "yyyy-MM-dd");
+        spinner.setEditor(editor);
+        spinner.setValue(Date.from(LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()));
+        spinner.setBorder(BorderFactory.createLineBorder(ProfessionalTheme.BORDER_COLOR));
+        spinner.setBackground(ProfessionalTheme.BACKGROUND_LIGHT);
+
+        JFormattedTextField textField = editor.getTextField();
+        ProfessionalTheme.styleTextField(textField);
+        textField.setHorizontalAlignment(SwingConstants.LEFT);
+
+        if (textField.getFormatter() instanceof DateFormatter dateFormatter) {
+            dateFormatter.setAllowsInvalid(false);
+            dateFormatter.setOverwriteMode(true);
+        }
+
+        spinner.setPreferredSize(textField.getPreferredSize());
+        return spinner;
     }
     
     // ============================================================
@@ -213,7 +269,7 @@ public class EmployeeDialog extends JDialog {
         addFormRow(formPanel, gbc, row++, "Monthly Salary:*", salaryField);
         
         // Hire Date
-        addFormRow(formPanel, gbc, row++, "Hire Date (YYYY-MM-DD):*", hireDateField);
+        addFormRow(formPanel, gbc, row++, "Hire Date:*", hireDateSpinner);
         
         // Setup manager panel
         setupManagerPanel();
@@ -338,6 +394,8 @@ public class EmployeeDialog extends JDialog {
      * Sets up event handlers for interactive components
      */
     private void setupEventHandlers() {
+        installSalaryFormatter();
+
         // Type combo box - show/hide manager panel
         typeComboBox.addActionListener(e -> {
             boolean isManager = typeComboBox.getSelectedIndex() == 1;
@@ -380,8 +438,8 @@ public class EmployeeDialog extends JDialog {
         departmentField.setText(employee.getDepartment());
         positionField.setText(employee.getPosition());
         ratingField.setText(String.valueOf(employee.getPerformanceRating()));
-        salaryField.setText(String.valueOf(employee.getSalary()));
-        hireDateField.setText(employee.getHireDate());
+        salaryField.setText(CURRENCY_FORMAT.format(employee.getSalary()));
+        setHireDate(employee.getHireDate());
         
         // Manager fields
         if (isManager) {
@@ -415,18 +473,18 @@ public class EmployeeDialog extends JDialog {
             String phone = phoneField.getText().trim();
             String department = departmentField.getText().trim();
             String position = positionField.getText().trim();
-            double rating = Double.parseDouble(ratingField.getText().trim());
-            double salary = Double.parseDouble(salaryField.getText().trim());
-            String hireDate = hireDateField.getText().trim();
+            double rating = parseFlexibleDouble(ratingField.getText());
+            double salary = parseFlexibleDouble(salaryField.getText());
+            String hireDate = getSelectedHireDate().toString();
             
             Employee employee;
             
             // Check if creating manager
             if (typeComboBox.getSelectedIndex() == 1) {
                 // Manager fields
-                int teamSize = Integer.parseInt(teamSizeField.getText().trim());
+                int teamSize = parseFlexibleInteger(teamSizeField.getText());
                 String level = (String) levelComboBox.getSelectedItem();
-                double bonus = Double.parseDouble(bonusField.getText().trim());
+                double bonus = parseFlexibleDouble(bonusField.getText());
                 
                 // Create manager using factory
                 employee = EmployeeFactory.createEmployee(
@@ -447,12 +505,22 @@ public class EmployeeDialog extends JDialog {
             // Save to data manager
             if (existingEmployee != null) {
                 // Update existing
-                dataManager.updateEmployee(employee);
+                if (!dataManager.updateEmployee(employee)) {
+                    JOptionPane.showMessageDialog(this,
+                        dataManager.getLastErrorMessage() != null
+                            ? dataManager.getLastErrorMessage()
+                            : "Unable to update employee record.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
             } else {
                 // Add new
                 if (!dataManager.addEmployee(employee)) {
                     JOptionPane.showMessageDialog(this,
-                        "Employee ID already exists!",
+                        dataManager.getLastErrorMessage() != null
+                            ? dataManager.getLastErrorMessage()
+                            : "Unable to add employee.",
                         "Error",
                         JOptionPane.ERROR_MESSAGE);
                     return;
@@ -464,7 +532,7 @@ public class EmployeeDialog extends JDialog {
             
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(this,
-                "Please enter valid numbers for rating, salary, team size, and bonus.",
+                "One or more numeric fields contain an unsupported value.",
                 "Validation Error",
                 JOptionPane.ERROR_MESSAGE);
         }
@@ -499,8 +567,15 @@ public class EmployeeDialog extends JDialog {
         if (salaryField.getText().trim().isEmpty()) {
             errors.append("- Salary is required\n");
         }
-        if (hireDateField.getText().trim().isEmpty()) {
-            errors.append("- Hire Date is required\n");
+
+        String email = emailField.getText().trim();
+        if (!email.isEmpty() && !EMAIL_PATTERN.matcher(email).matches()) {
+            errors.append("- Email must be a valid address\n");
+        }
+
+        String phone = phoneField.getText().trim();
+        if (!phone.isEmpty() && !isValidPhoneNumber(phone)) {
+            errors.append("- Phone must contain 7 to 15 digits and valid separators\n");
         }
         
         // Manager fields validation
@@ -515,12 +590,41 @@ public class EmployeeDialog extends JDialog {
         
         // Validate rating range
         try {
-            double rating = Double.parseDouble(ratingField.getText().trim());
+            double rating = parseFlexibleDouble(ratingField.getText());
             if (rating < 0 || rating > 100) {
                 errors.append("- Rating must be between 0 and 100\n");
             }
         } catch (NumberFormatException e) {
             errors.append("- Rating must be a valid number\n");
+        }
+
+        try {
+            double salary = parseFlexibleDouble(salaryField.getText());
+            if (salary < 0) {
+                errors.append("- Salary cannot be negative\n");
+            }
+        } catch (NumberFormatException e) {
+            errors.append("- Salary must be a valid amount\n");
+        }
+
+        if (typeComboBox.getSelectedIndex() == 1) {
+            try {
+                int teamSize = parseFlexibleInteger(teamSizeField.getText());
+                if (teamSize < 0) {
+                    errors.append("- Team Size cannot be negative\n");
+                }
+            } catch (NumberFormatException e) {
+                errors.append("- Team Size must be a whole number\n");
+            }
+
+            try {
+                double bonus = parseFlexibleDouble(bonusField.getText());
+                if (bonus < 0) {
+                    errors.append("- Bonus Percentage cannot be negative\n");
+                }
+            } catch (NumberFormatException e) {
+                errors.append("- Bonus Percentage must be a valid number\n");
+            }
         }
         
         // Show errors if any
@@ -533,6 +637,129 @@ public class EmployeeDialog extends JDialog {
         }
         
         return true;
+    }
+
+    private double parseFlexibleDouble(String value) {
+        return Double.parseDouble(normalizeNumericInput(value));
+    }
+
+    private int parseFlexibleInteger(String value) {
+        return Integer.parseInt(normalizeNumericInput(value));
+    }
+
+    private String normalizeNumericInput(String value) {
+        return value.trim()
+            .replace(",", "")
+            .replace("$", "")
+            .replace("₱", "")
+            .replace("%", "")
+            .replaceAll("\\s+", "");
+    }
+
+    private void installSalaryFormatter() {
+        salaryField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                formatSalaryField(false);
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                formatSalaryField(false);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                formatSalaryField(false);
+            }
+        });
+
+        salaryField.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                formatSalaryField(true);
+            }
+        });
+    }
+
+    private void formatSalaryField(boolean forceTwoDecimals) {
+        if (salaryFieldUpdating) {
+            return;
+        }
+
+        String formatted = formatCurrencyInput(salaryField.getText(), forceTwoDecimals);
+        if (formatted.equals(salaryField.getText())) {
+            return;
+        }
+
+        salaryFieldUpdating = true;
+        salaryField.setText(formatted);
+        salaryField.setCaretPosition(salaryField.getText().length());
+        salaryFieldUpdating = false;
+    }
+
+    private String formatCurrencyInput(String value, boolean forceTwoDecimals) {
+        String raw = value.replaceAll("[^\\d.]", "");
+        int decimalPoint = raw.indexOf('.');
+
+        if (decimalPoint >= 0) {
+            raw = raw.substring(0, decimalPoint + 1)
+                + raw.substring(decimalPoint + 1).replace(".", "");
+        }
+
+        if (raw.isEmpty()) {
+            return "";
+        }
+
+        String[] parts = raw.split("\\.", -1);
+        String wholePart = parts[0].isEmpty() ? "0" : parts[0];
+        String fractionalPart = parts.length > 1 ? parts[1] : "";
+
+        if (fractionalPart.length() > 2) {
+            fractionalPart = fractionalPart.substring(0, 2);
+        }
+
+        if (forceTwoDecimals) {
+            try {
+                return CURRENCY_FORMAT.format(parseFlexibleDouble(raw));
+            } catch (NumberFormatException e) {
+                return value;
+            }
+        }
+
+        StringBuilder formatted = new StringBuilder("$")
+            .append(GROUPING_FORMAT.format(new BigInteger(wholePart)));
+
+        if (raw.contains(".")) {
+            formatted.append(".").append(fractionalPart);
+        }
+
+        return formatted.toString();
+    }
+
+    private LocalDate getSelectedHireDate() {
+        Date selectedDate = (Date) hireDateSpinner.getValue();
+        return selectedDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private void setHireDate(String hireDate) {
+        try {
+            LocalDate parsedDate = LocalDate.parse(hireDate);
+            hireDateSpinner.setValue(Date.from(parsedDate
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()));
+        } catch (DateTimeParseException e) {
+            hireDateSpinner.setValue(Date.from(LocalDate.now()
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()));
+        }
+    }
+
+    private boolean isValidPhoneNumber(String phone) {
+        String digitsOnly = phone.replaceAll("\\D", "");
+        return PHONE_ALLOWED_PATTERN.matcher(phone).matches()
+            && digitsOnly.length() >= 7
+            && digitsOnly.length() <= 15;
     }
     
     // ============================================================

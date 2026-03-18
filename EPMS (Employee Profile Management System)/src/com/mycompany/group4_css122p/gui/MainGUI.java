@@ -5,14 +5,13 @@ import com.mycompany.group4_css122p.factory.EmployeeFactory;
 import com.mycompany.group4_css122p.gui.theme.ProfessionalTheme;
 import com.mycompany.group4_css122p.model.Employee;
 import com.mycompany.group4_css122p.model.Manager;
-
-import javax.swing.*;
-import javax.swing.border.*;
-import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
 import java.util.Map;
+import javax.swing.*;
+import javax.swing.border.*;
+import javax.swing.table.*;
 
 /**
  * MainGUI.java - Primary GUI Application (Employee Management Dashboard)
@@ -48,7 +47,7 @@ public class MainGUI extends JFrame {
     // ============================================================
     
     /** Data manager for all employee operations */
-    private EmployeeDataManager dataManager;
+    private final EmployeeDataManager dataManager;
     
     /** Table to display employee data */
     private JTable employeeTable;
@@ -445,7 +444,7 @@ public class MainGUI extends JFrame {
     /**
      * Refreshes the table with all employees
      */
-    public void refreshTable() {
+    private void refreshTable() {
         // Clear table
         tableModel.setRowCount(0);
         
@@ -467,6 +466,10 @@ public class MainGUI extends JFrame {
      * Adds a single employee row to the table
      */
     private void addEmployeeToTable(Employee emp) {
+        if (emp == null) {
+            return;
+        }
+
         String type = emp instanceof Manager ? "Manager" : "Regular";
         
         Object[] row = {
@@ -637,7 +640,9 @@ public class MainGUI extends JFrame {
                 updateStatistics();
                 setStatus("Employee deleted successfully");
             } else {
-                showError("Error deleting employee.");
+                showError(dataManager.getLastErrorMessage() != null
+                    ? dataManager.getLastErrorMessage()
+                    : "Error deleting employee.");
             }
         }
     }
@@ -708,6 +713,10 @@ public class MainGUI extends JFrame {
         avgRatingLabel.setText(String.format("%.1f", stats.get("averageRating")));
         topPerformersLabel.setText(String.valueOf(stats.get("eeCount")));
         totalPayrollLabel.setText(String.format("$%,.0f", stats.get("totalMonthlyPayroll")));
+
+        if (statsDashboard != null && statsDashboard.isDisplayable()) {
+            statsDashboard.refreshStatistics();
+        }
     }
     
     // ============================================================
